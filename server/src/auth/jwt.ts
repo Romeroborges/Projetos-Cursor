@@ -8,7 +8,9 @@ export type JwtPayload = {
 };
 
 export function signJwt(payload: JwtPayload): string {
-  return jwt.sign(payload, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN });
+  // `jsonwebtoken` tipa `expiresIn` como `StringValue | number` (ms). Nosso env vem como `string`.
+  const expiresIn = env.JWT_EXPIRES_IN as unknown as jwt.SignOptions['expiresIn'];
+  return jwt.sign(payload, env.JWT_SECRET, { expiresIn });
 }
 
 export function verifyJwt(token: string): JwtPayload {
