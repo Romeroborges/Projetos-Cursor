@@ -1,0 +1,15 @@
+{
+  "name": "bar-clube",
+  "private": true,
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "npm run -w server dev",
+    "build": "npm run -w server build",
+    "lint": "npm run -w server lint",
+    "db:migrate": "npm run -w server db:migrate",
+    "db:seed": "npm run -w server db:seed"
+  }
+}
