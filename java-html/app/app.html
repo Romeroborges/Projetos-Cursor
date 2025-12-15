@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bar Clube — App</title>
+  <style>
+    :root{--bg:#0b1020;--panel:rgba(255,255,255,.06);--border:rgba(255,255,255,.1);--text:rgba(255,255,255,.92);--muted:rgba(255,255,255,.65);--brand:#7c3aed;--ok:#22c55e;--warn:#f59e0b;--danger:#ef4444;--shadow:0 12px 40px rgba(0,0,0,.35);--r:14px;}
+    *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;color:var(--text);
+      background:radial-gradient(1200px 800px at 20% 10%, rgba(124,58,237,0.25), transparent 60%),radial-gradient(900px 600px at 80% 20%, rgba(34,197,94,0.18), transparent 55%),var(--bg);
+    }
+    .container{max-width:1120px;margin:0 auto;padding:24px}
+    .shell{display:grid;grid-template-columns:240px 1fr;gap:16px}
+    @media(max-width:900px){.shell{grid-template-columns:1fr}}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow)}
+    .hdr{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+    .body{padding:16px}
+    .h1{margin:0;font-size:20px} .h2{margin:4px 0 0;color:var(--muted);font-weight:600;font-size:13px}
+    .nav a{display:block;padding:10px 12px;border-radius:12px;color:var(--muted);text-decoration:none}
+    .nav a.active{background:rgba(124,58,237,.18);color:var(--text);border:1px solid rgba(124,58,237,.22)}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .spacer{flex:1}
+    .input{background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:12px;outline:none;min-width:200px}
+    .btn{border:1px solid var(--border);background:rgba(255,255,255,.06);color:var(--text);padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:800}
+    .btnPrimary{background:linear-gradient(135deg, rgba(124,58,237,0.95), rgba(34,197,94,0.75));border-color:rgba(255,255,255,0.10)}
+    .btnDanger{background:rgba(239,68,68,.18);border-color:rgba(239,68,68,.30)}
+    .badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:rgba(255,255,255,.06);color:var(--muted);font-size:12px;font-weight:800}
+    .bGreen{background:rgba(34,197,94,.14);border-color:rgba(34,197,94,.26);color:rgba(255,255,255,.9)}
+    .bAmber{background:rgba(245,158,11,.16);border-color:rgba(245,158,11,.30);color:rgba(255,255,255,.9)}
+    .bPurple{background:rgba(124,58,237,.16);border-color:rgba(124,58,237,.30);color:rgba(255,255,255,.9)}
+    .alert{padding:10px 12px;border-radius:12px;border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.14)}
+    .table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--border);border-radius:14px;overflow:hidden}
+    .table th,.table td{padding:10px 12px;border-bottom:1px solid var(--border)}
+    .table th{text-align:left;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+    .table tr:last-child td{border-bottom:0}
+    .kpi{padding:14px 16px;border-radius:16px;border:1px solid var(--border);background:rgba(255,255,255,.06)}
+    .kpiLabel{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+    .kpiValue{font-size:22px;font-weight:900;margin-top:6px}
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="shell">
+    <div class="card nav" style="position:sticky;top:16px;align-self:start">
+      <div class="hdr">
+        <div>
+          <div class="h1">Bar Clube</div>
+          <div class="h2" id="who">—</div>
+        </div>
+      </div>
+      <div class="body">
+        <a href="#" data-tab="dashboard" class="active">Dashboard</a>
+        <a href="#" data-tab="mesas">Mesas</a>
+        <a href="#" data-tab="produtos">Produtos</a>
+        <a href="#" data-tab="comandas">Comandas</a>
+        <a href="#" data-tab="caixa">Caixa</a>
+        <div style="height:12px"></div>
+        <button class="btn btnDanger" id="logout">Sair</button>
+      </div>
+    </div>
+
+    <div style="display:grid;gap:16px">
+      <div id="err" class="alert" style="display:none"></div>
+
+      <div id="view"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const token = localStorage.getItem('barclube.token');
+  const userRaw = localStorage.getItem('barclube.user');
+  if(!token){ window.location.href='/index.html'; }
+  let user = null;
+  try{ user = JSON.parse(userRaw); }catch{}
+  document.getElementById('who').textContent = user ? `${user.nome} • ${user.papel}` : '—';
+
+  document.getElementById('logout').addEventListener('click', ()=>{
+    localStorage.removeItem('barclube.token');
+    localStorage.removeItem('barclube.user');
+    window.location.href='/index.html';
+  });
+
+  const err = document.getElementById('err');
+  function showErr(msg){ err.style.display='block'; err.textContent = msg; }
+  function clearErr(){ err.style.display='none'; err.textContent=''; }
+
+  async function api(path, method='GET', body=null){
+    const headers = { 'Authorization': 'Bearer ' + token };
+    const init = { method, headers };
+    if(body){
+      init.body = (body instanceof URLSearchParams) ? body : body;
+    }
+    const res = await fetch('/api' + path, init);
+    const data = await res.json().catch(()=>null);
+    if(!res.ok){ throw new Error((data && data.error) ? data.error : 'HTTP_' + res.status); }
+    return data;
+  }
+
+  function brl(cents){
+    const v = (cents||0)/100;
+    return v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  }
+
+  function setActive(tab){
+    document.querySelectorAll('.nav a[data-tab]').forEach(a=>a.classList.toggle('active', a.dataset.tab===tab));
+  }
+
+  async function renderDashboard(){
+    setActive('dashboard');
+    clearErr();
+    const view = document.getElementById('view');
+    view.innerHTML = `
+      <div class="card">
+        <div class="hdr"><div><div class="h1">Dashboard</div><div class="h2">Visão geral rápida</div></div></div>
+        <div class="body">
+          <div class="row" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+            <div class="kpi"><div class="kpiLabel">Caixa</div><div class="kpiValue" id="k_cash">—</div></div>
+            <div class="kpi"><div class="kpiLabel">Comandas abertas</div><div class="kpiValue" id="k_open">—</div></div>
+          </div>
+          <div style="margin-top:12px;color:rgba(255,255,255,.65);line-height:1.6">
+            Fluxo recomendado: abrir caixa → abrir comanda → lançar itens → pagamentos → fechar comanda → fechar caixa.
+          </div>
+        </div>
+      </div>
+    `;
+
+    try{
+      const cash = await api('/cash/open');
+      const orders = await api('/orders?status=ABERTO');
+      document.getElementById('k_cash').textContent = cash ? ('Aberto • ' + brl(cash.valorInicial)) : 'Fechado';
+      document.getElementById('k_open').textContent = Array.isArray(orders) ? orders.length : '0';
+    }catch(e){ showErr(e.message); }
+  }
+
+  async function renderMesas(){
+    setActive('mesas');
+    clearErr();
+    const view = document.getElementById('view');
+    view.innerHTML = `
+      <div class="card">
+        <div class="hdr">
+          <div><div class="h1">Mesas</div><div class="h2">Cadastro e abertura de comanda</div></div>
+          <div class="row">
+            <input id="t_nome" class="input" placeholder="Nome/Número" />
+            <button id="t_add" class="btn btnPrimary">Adicionar</button>
+            <button id="t_ref" class="btn">Atualizar</button>
+          </div>
+        </div>
+        <div class="body">
+          <table class="table"><thead><tr><th>Mesa</th><th>Status</th><th>Ações</th></tr></thead><tbody id="t_body"></tbody></table>
+        </div>
+      </div>
+    `;
+
+    async function load(){
+      try{
+        const tables = await api('/tables');
+        const tb = document.getElementById('t_body');
+        tb.innerHTML='';
+        for(const t of tables){
+          const badge = t.status==='LIVRE' ? '<span class="badge bGreen">Livre</span>' : (t.status==='AGUARDANDO_PAGAMENTO' ? '<span class="badge bAmber">Aguardando</span>' : '<span class="badge bPurple">Ocupado</span>');
+          const btn = t.status==='LIVRE' ? `<button class="btn btnPrimary" data-open="${t.id}">Abrir comanda</button>` : `<span style="color:rgba(255,255,255,.6)">—</span>`;
+          tb.insertAdjacentHTML('beforeend', `<tr><td style="font-weight:900">${t.nomeOuNumero}</td><td>${badge}</td><td>${btn}</td></tr>`);
+        }
+        tb.querySelectorAll('button[data-open]').forEach(b=>b.addEventListener('click', async ()=>{
+          try{
+            const tableId = b.getAttribute('data-open');
+            const form = new URLSearchParams();
+            form.set('tipoIdentificacao','MESA');
+            form.set('tableId', tableId);
+            const order = await api('/orders','POST',form);
+            window.location.hash = '#comandas';
+            await renderComandas(order.id);
+          }catch(e){ showErr(e.message); }
+        }));
+      }catch(e){ showErr(e.message); }
+    }
+
+    document.getElementById('t_ref').addEventListener('click', load);
+    document.getElementById('t_add').addEventListener('click', async ()=>{
+      try{
+        const nome = document.getElementById('t_nome').value.trim();
+        const form = new URLSearchParams();
+        form.set('nomeOuNumero', nome);
+        await api('/tables','POST',form);
+        document.getElementById('t_nome').value='';
+        await load();
+      }catch(e){ showErr(e.message); }
+    });
+
+    await load();
+  }
+
+  async function renderProdutos(){
+    setActive('produtos');
+    clearErr();
+    const view = document.getElementById('view');
+    view.innerHTML = `
+      <div class="card">
+        <div class="hdr"><div><div class="h1">Produtos</div><div class="h2">Cadastro e preços (em centavos na API)</div></div>
+          <div class="row"><button id="p_ref" class="btn">Atualizar</button></div>
+        </div>
+        <div class="body">
+          <table class="table"><thead><tr><th>Categoria</th><th>Produto</th><th>Preço</th><th>Estoque</th></tr></thead><tbody id="p_body"></tbody></table>
+          <div style="height:14px"></div>
+          <div class="card" style="box-shadow:none">
+            <div class="hdr"><div><div class="h1">Novo produto</div><div class="h2">Envie preço em centavos (ex: 800 = R$ 8,00)</div></div>
+              <button id="p_add" class="btn btnPrimary">Cadastrar</button>
+            </div>
+            <div class="body">
+              <div class="row">
+                <input id="p_cat" class="input" placeholder="Categoria" />
+                <input id="p_nome" class="input" placeholder="Nome" />
+                <input id="p_preco" class="input" placeholder="Preço (centavos)" />
+                <label style="color:rgba(255,255,255,.75);font-weight:800"><input id="p_ctrl" type="checkbox" /> Controla estoque</label>
+                <input id="p_qtd" class="input" placeholder="Qtd atual" value="0" />
+                <input id="p_min" class="input" placeholder="Qtd mínima" value="0" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    async function load(){
+      try{
+        const products = await api('/products');
+        const tb = document.getElementById('p_body');
+        tb.innerHTML='';
+        for(const p of products){
+          const estoque = p.controlaEstoque ? `${p.estoque?.quantidadeAtual ?? '-'} (min ${p.estoque?.quantidadeMinima ?? '-'})` : 'Não controla';
+          tb.insertAdjacentHTML('beforeend', `<tr><td style="color:rgba(255,255,255,.75)">${p.categoria}</td><td style="font-weight:900">${p.nome}</td><td style="font-weight:900">${brl(p.preco)}</td><td>${estoque}</td></tr>`);
+        }
+      }catch(e){ showErr(e.message); }
+    }
+
+    document.getElementById('p_ref').addEventListener('click', load);
+    document.getElementById('p_add').addEventListener('click', async ()=>{
+      try{
+        const form = new URLSearchParams();
+        form.set('categoria', document.getElementById('p_cat').value.trim());
+        form.set('nome', document.getElementById('p_nome').value.trim());
+        form.set('preco', document.getElementById('p_preco').value.trim());
+        form.set('controleDeEstoque', document.getElementById('p_ctrl').checked ? 'true' : 'false');
+        form.set('quantidadeAtual', document.getElementById('p_qtd').value.trim());
+        form.set('quantidadeMinima', document.getElementById('p_min').value.trim());
+        await api('/products','POST',form);
+        await load();
+      }catch(e){ showErr(e.message); }
+    });
+
+    await load();
+  }
+
+  async function renderComandas(focusId=null){
+    setActive('comandas');
+    clearErr();
+    const view = document.getElementById('view');
+    view.innerHTML = `
+      <div class="card">
+        <div class="hdr"><div><div class="h1">Comandas</div><div class="h2">Abertas/andamento/fechadas</div></div>
+          <div class="row">
+            <select id="o_status" class="input" style="min-width:180px">
+              <option value="">Todas</option>
+              <option value="ABERTO">Abertas</option>
+              <option value="EM_ANDAMENTO">Em andamento</option>
+              <option value="FECHADO">Fechadas</option>
+            </select>
+            <button id="o_ref" class="btn">Atualizar</button>
+          </div>
+        </div>
+        <div class="body">
+          <table class="table"><thead><tr><th>Status</th><th>Identificação</th><th>Total</th><th>Ações</th></tr></thead><tbody id="o_body"></tbody></table>
+          <div id="o_detail" style="margin-top:16px"></div>
+        </div>
+      </div>
+    `;
+
+    async function load(){
+      try{
+        const st = document.getElementById('o_status').value;
+        const qs = new URLSearchParams();
+        if(st) qs.set('status', st);
+        const orders = await api('/orders?' + qs.toString());
+        const tb = document.getElementById('o_body');
+        tb.innerHTML='';
+        for(const o of orders){
+          const badge = o.status==='FECHADO' ? '<span class="badge bGreen">Fechado</span>' : (o.status==='EM_ANDAMENTO' ? '<span class="badge bPurple">Andamento</span>' : '<span class="badge bAmber">Aberto</span>');
+          const ident = o.tipoIdentificacao==='MESA' ? `Mesa ${o.table?.nomeOuNumero ?? '—'}` : (o.nomeCliente ?? '—');
+          tb.insertAdjacentHTML('beforeend', `<tr><td>${badge}</td><td style="font-weight:900">${ident}<div style="color:rgba(255,255,255,.55);font-size:12px">${o.id}</div></td><td style="font-weight:900">${brl(o.valorTotal)}</td><td><button class="btn" data-view="${o.id}">Detalhes</button></td></tr>`);
+        }
+        tb.querySelectorAll('button[data-view]').forEach(b=>b.addEventListener('click', ()=>showDetails(b.getAttribute('data-view'))));
+        if(focusId) await showDetails(focusId);
+      }catch(e){ showErr(e.message); }
+    }
+
+    async function showDetails(orderId){
+      try{
+        const o = await api('/orders/' + orderId);
+        const paid = (o.pagamentos||[]).reduce((s,p)=>s+p.valor,0);
+        const rest = Math.max(0, o.valorTotal - paid);
+
+        const prod = await api('/products');
+        const opts = prod.filter(p=>p.ativo).map(p=>`<option value="${p.id}">${p.categoria} • ${p.nome} (${brl(p.preco)})</option>`).join('');
+
+        document.getElementById('o_detail').innerHTML = `
+          <div class="card" style="box-shadow:none">
+            <div class="hdr"><div><div class="h1">Detalhes</div><div class="h2">${orderId}</div></div>
+              <div class="row">
+                <span class="badge bPurple">Total ${brl(o.valorTotal)}</span>
+                <span class="badge bGreen">Pago ${brl(paid)}</span>
+                <span class="badge bAmber">Restante ${brl(rest)}</span>
+                <button id="o_close" class="btn btnPrimary" ${o.status==='FECHADO'?'disabled':''}>Fechar</button>
+              </div>
+            </div>
+            <div class="body">
+              <div class="row">
+                <select id="it_prod" class="input">${opts}</select>
+                <input id="it_qtd" class="input" type="number" min="1" value="1" style="min-width:120px" />
+                <input id="it_obs" class="input" placeholder="Observação" />
+                <button id="it_add" class="btn btnPrimary" ${o.status==='FECHADO'?'disabled':''}>Adicionar item</button>
+              </div>
+
+              <div style="height:12px"></div>
+              <table class="table"><thead><tr><th>Produto</th><th>Qtd</th><th>Total</th></tr></thead><tbody>
+                ${(o.itens||[]).map(it=>`<tr><td style="font-weight:900">${it.product?.nome ?? '?'}</td><td>${it.quantidade}</td><td style="font-weight:900">${brl(it.precoTotal)}</td></tr>`).join('') || `<tr><td colspan="3" style="color:rgba(255,255,255,.65)">Nenhum item</td></tr>`}
+              </tbody></table>
+
+              <div style="height:12px"></div>
+              <div class="row">
+                <select id="p_met" class="input" style="min-width:180px">
+                  <option value="PIX">PIX</option>
+                  <option value="DINHEIRO">Dinheiro</option>
+                  <option value="DEBITO">Débito</option>
+                  <option value="CREDITO">Crédito</option>
+                </select>
+                <input id="p_val" class="input" placeholder="Valor (centavos)" />
+                <button id="p_add" class="btn btnPrimary" ${o.status==='FECHADO'?'disabled':''}>Registrar pagamento</button>
+                <button id="p_fill" class="btn">Preencher restante</button>
+              </div>
+              <div style="height:12px"></div>
+              <table class="table"><thead><tr><th>Método</th><th>Valor</th></tr></thead><tbody>
+                ${(o.pagamentos||[]).map(p=>`<tr><td style="font-weight:900">${p.metodo}</td><td style="font-weight:900">${brl(p.valor)}</td></tr>`).join('') || `<tr><td colspan="2" style="color:rgba(255,255,255,.65)">Nenhum pagamento</td></tr>`}
+              </tbody></table>
+            </div>
+          </div>
+        `;
+
+        document.getElementById('it_add').addEventListener('click', async ()=>{
+          try{
+            const form = new URLSearchParams();
+            form.set('productId', document.getElementById('it_prod').value);
+            form.set('quantidade', document.getElementById('it_qtd').value);
+            const obs = document.getElementById('it_obs').value.trim();
+            if(obs) form.set('observacao', obs);
+            await api(`/orders/${orderId}/items`,'POST',form);
+            await showDetails(orderId);
+            await load();
+          }catch(e){ showErr(e.message); }
+        });
+
+        document.getElementById('p_fill').addEventListener('click', ()=>{
+          document.getElementById('p_val').value = String(rest);
+        });
+
+        document.getElementById('p_add').addEventListener('click', async ()=>{
+          try{
+            const form = new URLSearchParams();
+            form.set('metodo', document.getElementById('p_met').value);
+            form.set('valor', document.getElementById('p_val').value.trim());
+            await api(`/orders/${orderId}/payments`,'POST',form);
+            document.getElementById('p_val').value='';
+            await showDetails(orderId);
+            await load();
+          }catch(e){ showErr(e.message); }
+        });
+
+        document.getElementById('o_close').addEventListener('click', async ()=>{
+          try{
+            await api(`/orders/${orderId}/close`,'POST',new URLSearchParams());
+            await showDetails(orderId);
+            await load();
+          }catch(e){ showErr(e.message); }
+        });
+
+      }catch(e){ showErr(e.message); }
+    }
+
+    document.getElementById('o_ref').addEventListener('click', load);
+    document.getElementById('o_status').addEventListener('change', load);
+
+    await load();
+  }
+
+  async function renderCaixa(){
+    setActive('caixa');
+    clearErr();
+    const view = document.getElementById('view');
+    view.innerHTML = `
+      <div class="card">
+        <div class="hdr"><div><div class="h1">Caixa</div><div class="h2">Abertura, sangria/reforço, fechamento</div></div>
+          <div class="row"><button id="c_ref" class="btn">Atualizar</button></div>
+        </div>
+        <div class="body" id="c_body"></div>
+      </div>
+    `;
+
+    async function load(){
+      try{
+        const cash = await api('/cash/open');
+        const c = document.getElementById('c_body');
+        if(!cash){
+          c.innerHTML = `
+            <div class="row">
+              <span class="badge bAmber">FECHADO</span>
+              <input id="c_init" class="input" placeholder="Valor inicial (centavos)" />
+              <button id="c_open" class="btn btnPrimary">Abrir caixa</button>
+            </div>
+          `;
+          document.getElementById('c_open').addEventListener('click', async ()=>{
+            try{
+              const form = new URLSearchParams();
+              form.set('valorInicial', document.getElementById('c_init').value.trim());
+              await api('/cash/open','POST',form);
+              await load();
+            }catch(e){ showErr(e.message); }
+          });
+        }else{
+          c.innerHTML = `
+            <div class="row">
+              <span class="badge bGreen">ABERTO</span>
+              <span class="badge bPurple">Inicial ${brl(cash.valorInicial)}</span>
+            </div>
+            <div style="height:12px"></div>
+            <div class="row">
+              <select id="c_type" class="input" style="min-width:180px"><option value="SANGRIA">Sangria</option><option value="REFORCO">Reforço</option></select>
+              <input id="c_val" class="input" placeholder="Valor (centavos)" />
+              <button id="c_adj" class="btn btnPrimary">Registrar</button>
+            </div>
+            <div style="height:12px"></div>
+            <div class="row">
+              <input id="c_final" class="input" placeholder="Valor final conferido (centavos)" />
+              <button id="c_close" class="btn btnDanger">Fechar caixa</button>
+            </div>
+          `;
+
+          document.getElementById('c_adj').addEventListener('click', async ()=>{
+            try{
+              const form = new URLSearchParams();
+              form.set('type', document.getElementById('c_type').value);
+              form.set('valor', document.getElementById('c_val').value.trim());
+              await api('/cash/adjust','POST',form);
+              document.getElementById('c_val').value='';
+            }catch(e){ showErr(e.message); }
+          });
+
+          document.getElementById('c_close').addEventListener('click', async ()=>{
+            try{
+              const form = new URLSearchParams();
+              form.set('valorFinal', document.getElementById('c_final').value.trim());
+              const out = await api('/cash/close','POST',form);
+              alert('Caixa fechado. Diferença (diff): ' + out.diff + ' centavos');
+              await load();
+            }catch(e){ showErr(e.message); }
+          });
+        }
+      }catch(e){ showErr(e.message); }
+    }
+
+    document.getElementById('c_ref').addEventListener('click', load);
+    await load();
+  }
+
+  async function route(){
+    const hash = (window.location.hash || '#dashboard').slice(1);
+    if(hash==='dashboard') return renderDashboard();
+    if(hash==='mesas') return renderMesas();
+    if(hash==='produtos') return renderProdutos();
+    if(hash==='comandas') return renderComandas();
+    if(hash==='caixa') return renderCaixa();
+    window.location.hash = '#dashboard';
+  }
+
+  document.querySelectorAll('.nav a[data-tab]').forEach(a=>a.addEventListener('click', (e)=>{
+    e.preventDefault();
+    window.location.hash = '#' + a.dataset.tab;
+  }));
+
+  window.addEventListener('hashchange', route);
+  route();
+</script>
+</body>
+</html>
