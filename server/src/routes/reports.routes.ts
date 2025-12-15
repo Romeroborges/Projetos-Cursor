@@ -67,7 +67,7 @@ reportsRouter.get('/sales.csv', requirePermission('reports:read'), async (req, r
     );
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename=\"vendas.csv\"');
+    res.setHeader('Content-Disposition', 'attachment; filename="vendas.csv"');
     res.send(csv);
   } catch (e) {
     next(e);

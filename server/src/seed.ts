@@ -39,13 +39,11 @@ async function main() {
     await prisma.product.create({ data: { nome: 'Porção Batata', categoria: 'Cozinha', preco: 2500, controlaEstoque: false } });
   }
 
-  // eslint-disable-next-line no-console
   console.log('Seed concluído. Login: admin@bar.local / admin123');
 }
 
 main()
   .catch((e) => {
-    // eslint-disable-next-line no-console
     console.error(e);
     process.exit(1);
   })

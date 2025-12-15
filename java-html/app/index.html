@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bar Clube (Java + HTML)</title>
+  <style>
+    :root{--bg:#0b1020;--panel:rgba(255,255,255,.06);--border:rgba(255,255,255,.1);--text:rgba(255,255,255,.92);--muted:rgba(255,255,255,.65);--brand:#7c3aed;--ok:#22c55e;--warn:#f59e0b;--shadow:0 12px 40px rgba(0,0,0,.35);--r:14px;}
+    *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;color:var(--text);
+      background:radial-gradient(1200px 800px at 20% 10%, rgba(124,58,237,0.25), transparent 60%),radial-gradient(900px 600px at 80% 20%, rgba(34,197,94,0.18), transparent 55%),var(--bg);
+    }
+    .container{max-width:920px;margin:0 auto;padding:24px}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow)}
+    .hdr{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+    .body{padding:16px}
+    .h1{margin:0;font-size:22px} .h2{margin:4px 0 0;color:var(--muted);font-weight:600;font-size:14px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .input{background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:12px;outline:none;min-width:240px}
+    .btn{border:1px solid var(--border);background:rgba(255,255,255,.06);color:var(--text);padding:10px 12px;border-radius:12px;cursor:pointer;font-weight:700}
+    .btnPrimary{background:linear-gradient(135deg, rgba(124,58,237,0.95), rgba(34,197,94,0.75));border-color:rgba(255,255,255,0.10)}
+    .alert{padding:10px 12px;border-radius:12px;border:1px solid rgba(245,158,11,.35);background:rgba(245,158,11,.14)}
+    a{color:inherit}
+    code{color:rgba(255,255,255,.85)}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="hdr">
+        <div>
+          <div class="h1">Bar Clube</div>
+          <div class="h2">Versão Java + HTML (sem frameworks no frontend)</div>
+        </div>
+        <div style="color:var(--muted);font-weight:700">Login</div>
+      </div>
+      <div class="body">
+        <div id="err" class="alert" style="display:none"></div>
+        <form id="f" class="row">
+          <input class="input" name="email" placeholder="email" value="admin@bar.local" />
+          <input class="input" name="senha" placeholder="senha" type="password" value="admin123" />
+          <button class="btn btnPrimary" type="submit">Entrar</button>
+        </form>
+        <div style="margin-top:12px;color:var(--muted);line-height:1.6">
+          Se for seu primeiro uso: compile e rode o servidor Java e depois abra esta página.
+          <br />
+          Health: <a href="/api/health" target="_blank" rel="noreferrer"><code>/api/health</code></a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const err = document.getElementById('err');
+  const f = document.getElementById('f');
+
+  function showError(msg){ err.style.display='block'; err.textContent = msg; }
+
+  f.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    err.style.display='none';
+
+    const fd = new FormData(f);
+    const body = new URLSearchParams();
+    body.set('email', fd.get('email'));
+    body.set('senha', fd.get('senha'));
+
+    try{
+      const res = await fetch('/api/auth/login', { method:'POST', body });
+      const data = await res.json().catch(()=>null);
+      if(!res.ok){
+        showError((data && data.error) ? data.error : 'Falha ao autenticar');
+        return;
+      }
+      localStorage.setItem('barclube.token', data.token);
+      localStorage.setItem('barclube.user', JSON.stringify(data.user));
+      window.location.href = '/app.html';
+    }catch(e2){
+      showError('Não consegui conectar na API. Verifique se o servidor Java está rodando.');
+    }
+  });
+</script>
+</body>
+</html>
